@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,15 +53,35 @@ import androidx.navigation.NavHostController
 @Composable
 fun TelaDetalheAgendamento(navController: NavHostController, viewModel: MeuViewModel, id: Int) {
 
-    val item = viewModel.buscarAgendamento(id)
-    val local = if (item == null) null else viewModel.buscarEstabelecimento(item.idEstabelecimento)
+    var item by remember { mutableStateOf<Agendamento?>(null) }
+    var local by remember { mutableStateOf<Estabelecimento?>(null) }
+    var carregando by remember { mutableStateOf(true) }
+    // muda de valor depois de salvar/concluir, para o LaunchedEffect buscar de novo no banco
+    var recarregar by remember { mutableStateOf(0) }
 
-    var servico by remember { mutableStateOf(item?.servico ?: "") }
-    var data by remember { mutableStateOf(item?.data ?: "") }
-    var hora by remember { mutableStateOf(item?.hora ?: "") }
-    var preco by remember { mutableStateOf(if (item == null) "" else "%.2f".format(item.preco)) }
-    var observacao by remember { mutableStateOf(item?.observacao ?: "") }
+    var servico by remember { mutableStateOf("") }
+    var data by remember { mutableStateOf("") }
+    var hora by remember { mutableStateOf("") }
+    var preco by remember { mutableStateOf("") }
+    var observacao by remember { mutableStateOf("") }
     var salvo by remember { mutableStateOf(false) }
+
+    // busca o agendamento direto do banco pelo id recebido na navegação
+    LaunchedEffect(id, recarregar) {
+        val doBanco = viewModel.buscarAgendamentoPorId(id)
+        if (doBanco != null) {
+            local = viewModel.buscarEstabelecimentoPorId(doBanco.idEstabelecimento)
+            if (carregando) {
+                servico = doBanco.servico
+                data = doBanco.data
+                hora = doBanco.hora
+                preco = "%.2f".format(doBanco.preco)
+                observacao = doBanco.observacao
+            }
+        }
+        item = doBanco
+        carregando = false
+    }
 
     Scaffold(
         topBar = {
@@ -83,12 +104,17 @@ fun TelaDetalheAgendamento(navController: NavHostController, viewModel: MeuViewM
         }
     ) { innerPadding ->
 
+        val item = item
+        val local = local
         if (item == null) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Agendamento não encontrado", color = Color(0xFF6B7A74))
+                Text(
+                    if (carregando) "Carregando..." else "Agendamento não encontrado",
+                    color = Color(0xFF6B7A74)
+                )
             }
             return@Scaffold
         }
@@ -248,7 +274,10 @@ fun TelaDetalheAgendamento(navController: NavHostController, viewModel: MeuViewM
 
                 Button(
                     onClick = {
-                        salvo = viewModel.atualizarAgendamento(item.id, servico, data, hora, preco, observacao)
+                        viewModel.atualizarAgendamento(item, servico, data, hora, preco, observacao) {
+                            salvo = true
+                            recarregar++
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF009739)),
                     modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -260,7 +289,7 @@ fun TelaDetalheAgendamento(navController: NavHostController, viewModel: MeuViewM
             Spacer(modifier = Modifier.padding(6.dp))
 
             Button(
-                onClick = { viewModel.alternarConcluido(item) },
+                onClick = { viewModel.alternarConcluido(item) { recarregar++ } },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (item.concluido) Color(0xFF6B7A74) else Color(0xFF007A2E)
                 ),

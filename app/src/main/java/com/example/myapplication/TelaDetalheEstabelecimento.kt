@@ -30,6 +30,11 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -42,9 +47,18 @@ import androidx.navigation.NavHostController
 @Composable
 fun TelaDetalheEstabelecimento(navController: NavHostController, viewModel: MeuViewModel, id: Int) {
 
-    val local = viewModel.buscarEstabelecimento(id)
-    val agendamentos = viewModel.agendamentosDoEstabelecimento(id)
-    val total = viewModel.totalGastoNoEstabelecimento(id)
+    var local by remember { mutableStateOf<Estabelecimento?>(null) }
+    var agendamentos by remember { mutableStateOf<List<Agendamento>>(emptyList()) }
+    var carregando by remember { mutableStateOf(true) }
+
+    // busca o estabelecimento e os agendamentos dele direto do banco, a partir do id da rota
+    LaunchedEffect(id) {
+        local = viewModel.buscarEstabelecimentoPorId(id)
+        agendamentos = viewModel.buscarAgendamentosDoEstabelecimento(id)
+        carregando = false
+    }
+
+    val total = agendamentos.sumOf { it.preco }
     val media = if (agendamentos.isEmpty()) 0.0 else total / agendamentos.size
     val concluidos = agendamentos.count { it.concluido }
 
@@ -69,12 +83,16 @@ fun TelaDetalheEstabelecimento(navController: NavHostController, viewModel: MeuV
         }
     ) { innerPadding ->
 
+        val local = local
         if (local == null) {
             Box(
                 modifier = Modifier.fillMaxSize().padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Estabelecimento não encontrado", color = Color(0xFF6B7A74))
+                Text(
+                    if (carregando) "Carregando..." else "Estabelecimento não encontrado",
+                    color = Color(0xFF6B7A74)
+                )
             }
             return@Scaffold
         }

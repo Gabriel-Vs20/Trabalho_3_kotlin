@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +58,11 @@ fun AbaAgendamentos(navController: NavHostController, viewModel: MeuViewModel) {
     var preco by remember { mutableStateOf("") }
     var idSelecionado by remember { mutableStateOf(0) }
     var formularioAberto by remember { mutableStateOf(false) }
+
+    // busca os agendamentos (e os estabelecimentos, para mostrar o nome do local) no banco
+    LaunchedEffect(Unit) {
+        viewModel.carregarTudo()
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),

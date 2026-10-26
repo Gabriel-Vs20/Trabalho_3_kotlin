@@ -1,12 +1,22 @@
 package com.example.myapplication
 
+import android.app.Application
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class MeuViewModel : ViewModel() {
+class MeuViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val db = AppDatabase.getDatabase(application)
+    private val estabelecimentoDao = db.estabelecimentoDAO()
+    private val agendamentoDao = db.agendamentoDAO()
 
     var user by mutableStateOf("")
         private set
@@ -50,22 +60,12 @@ class MeuViewModel : ViewModel() {
     var erroAgendamento by mutableStateOf("")
         private set
 
-    private var proximoIdEstabelecimento = 4
-    private var proximoIdAgendamento = 5
     private var proximoIdNotificacao = 5
 
-    val estabelecimentos = mutableStateListOf(
-        Estabelecimento(1, "Barbearia A", "Barbearia", "4.9", "Rua XV de Novembro, 120"),
-        Estabelecimento(2, "Studio Bella", "Salão de beleza", "4.7", "Av. Sete de Setembro, 455"),
-        Estabelecimento(3, "AutoShine", "Estética automotiva", "4.8", "Rua Brigadeiro Franco, 980")
-    )
+    // as listas agora só espelham o que está no banco; quem preenche são as funções carregar...()
+    val estabelecimentos = mutableStateListOf<Estabelecimento>()
 
-    val agendamentos = mutableStateListOf(
-        Agendamento(1, 1, "Corte masculino", "25/10/2026", "14:30", 45.0, "Máquina 2 nas laterais", true),
-        Agendamento(2, 1, "Corte e barba", "31/10/2026", "10:00", 70.0, "", false),
-        Agendamento(3, 2, "Escova e hidratação", "01/11/2026", "16:00", 120.0, "Cabelo bem comprido", false),
-        Agendamento(4, 3, "Lavagem completa", "05/11/2026", "09:30", 90.0, "Carro prata, placa ABC-1234", true)
-    )
+    val agendamentos = mutableStateListOf<Agendamento>()
 
     val notificacoes = mutableStateListOf(
         Notificacao(1, "Agendamento confirmado", "A Barbearia A confirmou seu corte de 31/10 às 10:00.", "Hoje, 09:12", false),
@@ -168,28 +168,109 @@ class MeuViewModel : ViewModel() {
         mensagemPerfil = ""
     }
 
+    // ---------- Banco de dados (Room) ----------
+
+    suspend fun carregarEstabelecimentos() {
+        val lista = withContext(Dispatchers.IO) {
+            try {
+                estabelecimentoDao.buscarTodos()
+            } catch (e: Exception) {
+                Log.e("Erro ao buscar", "Estabelecimentos: ${e.message}")
+                emptyList()
+            }
+        }
+        withContext(Dispatchers.Main) {
+            estabelecimentos.clear()
+            estabelecimentos.addAll(lista)
+        }
+    }
+
+    suspend fun carregarAgendamentos() {
+        val lista = withContext(Dispatchers.IO) {
+            try {
+                agendamentoDao.buscarTodos()
+            } catch (e: Exception) {
+                Log.e("Erro ao buscar", "Agendamentos: ${e.message}")
+                emptyList()
+            }
+        }
+        withContext(Dispatchers.Main) {
+            agendamentos.clear()
+            agendamentos.addAll(lista)
+        }
+    }
+
+    suspend fun carregarTudo() {
+        carregarEstabelecimentos()
+        carregarAgendamentos()
+    }
+
+    suspend fun buscarEstabelecimentoPorId(id: Int): Estabelecimento? {
+        return withContext(Dispatchers.IO) {
+            try {
+                estabelecimentoDao.buscarPorId(id)
+            } catch (e: Exception) {
+                Log.e("Erro ao buscar", "Estabelecimento $id: ${e.message}")
+                null
+            }
+        }
+    }
+
+    suspend fun buscarAgendamentoPorId(id: Int): Agendamento? {
+        return withContext(Dispatchers.IO) {
+            try {
+                agendamentoDao.buscarPorId(id)
+            } catch (e: Exception) {
+                Log.e("Erro ao buscar", "Agendamento $id: ${e.message}")
+                null
+            }
+        }
+    }
+
+    suspend fun buscarAgendamentosDoEstabelecimento(id: Int): List<Agendamento> {
+        return withContext(Dispatchers.IO) {
+            try {
+                agendamentoDao.buscarPorEstabelecimento(id)
+            } catch (e: Exception) {
+                Log.e("Erro ao buscar", "Agendamentos do estabelecimento $id: ${e.message}")
+                emptyList()
+            }
+        }
+    }
+
     fun adicionarEstabelecimento(nome: String, categoria: String, nota: String, endereco: String): Boolean {
         if (nome.isBlank() || categoria.isBlank()) {
             erroEstabelecimento = "Informe pelo menos nome e categoria"
             return false
         }
-        estabelecimentos.add(
-            Estabelecimento(
-                id = proximoIdEstabelecimento,
-                nome = nome,
-                categoria = categoria,
-                nota = if (nota.isBlank()) "0.0" else nota,
-                endereco = if (endereco.isBlank()) "Endereço não informado" else endereco
-            )
+        val novo = Estabelecimento(
+            nome = nome,
+            categoria = categoria,
+            nota = if (nota.isBlank()) "0.0" else nota,
+            endereco = if (endereco.isBlank()) "Endereço não informado" else endereco
         )
-        proximoIdEstabelecimento++
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                estabelecimentoDao.inserir(novo)
+                carregarEstabelecimentos()
+            } catch (e: Exception) {
+                Log.e("Erro do Add", "Estabelecimento: ${e.message}")
+            }
+        }
         erroEstabelecimento = ""
         return true
     }
 
     fun removerEstabelecimento(item: Estabelecimento) {
-        estabelecimentos.remove(item)
-        agendamentos.removeAll { it.idEstabelecimento == item.id }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                agendamentoDao.deletarPorEstabelecimento(item.id)
+                estabelecimentoDao.deletar(item)
+                carregarTudo()
+            } catch (e: Exception) {
+                Log.e("Erro ao remover", "Estabelecimento: ${e.message}")
+            }
+        }
     }
 
     fun buscarEstabelecimento(id: Int): Estabelecimento? {
@@ -198,10 +279,6 @@ class MeuViewModel : ViewModel() {
 
     fun agendamentosDoEstabelecimento(id: Int): List<Agendamento> {
         return agendamentos.filter { it.idEstabelecimento == id }
-    }
-
-    fun totalGastoNoEstabelecimento(id: Int): Double {
-        return agendamentos.filter { it.idEstabelecimento == id }.sumOf { it.preco }
     }
 
     fun adicionarAgendamento(idEstabelecimento: Int, servico: String, data: String, hora: String, preco: String): Boolean {
@@ -218,51 +295,67 @@ class MeuViewModel : ViewModel() {
             erroAgendamento = "Preço inválido"
             return false
         }
-        agendamentos.add(
-            Agendamento(
-                id = proximoIdAgendamento,
-                idEstabelecimento = idEstabelecimento,
-                servico = servico,
-                data = data,
-                hora = hora,
-                preco = valor
-            )
+        val novo = Agendamento(
+            idEstabelecimento = idEstabelecimento,
+            servico = servico,
+            data = data,
+            hora = hora,
+            preco = valor
         )
-        proximoIdAgendamento++
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                agendamentoDao.inserir(novo)
+                carregarAgendamentos()
+            } catch (e: Exception) {
+                Log.e("Erro do Add", "Agendamento: ${e.message}")
+            }
+        }
         erroAgendamento = ""
         return true
     }
 
     fun removerAgendamento(item: Agendamento) {
-        agendamentos.remove(item)
-    }
-
-    fun alternarConcluido(item: Agendamento) {
-        val posicao = agendamentos.indexOfFirst { it.id == item.id }
-        if (posicao >= 0) {
-            agendamentos[posicao] = item.copy(concluido = !item.concluido)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                agendamentoDao.deletar(item)
+                carregarAgendamentos()
+            } catch (e: Exception) {
+                Log.e("Erro ao remover", "Agendamento: ${e.message}")
+            }
         }
     }
 
-    fun buscarAgendamento(id: Int): Agendamento? {
-        return agendamentos.find { it.id == id }
+    fun alternarConcluido(item: Agendamento, aoTerminar: () -> Unit = {}) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                agendamentoDao.atualizar(item.copy(concluido = !item.concluido))
+                carregarAgendamentos()
+                withContext(Dispatchers.Main) { aoTerminar() }
+            } catch (e: Exception) {
+                Log.e("Erro ao atualizar", "Agendamento: ${e.message}")
+            }
+        }
     }
 
-    fun atualizarAgendamento(id: Int, servico: String, data: String, hora: String, preco: String, observacao: String): Boolean {
-        val posicao = agendamentos.indexOfFirst { it.id == id }
-        if (posicao < 0) {
-            return false
-        }
+    fun atualizarAgendamento(
+        item: Agendamento,
+        servico: String,
+        data: String,
+        hora: String,
+        preco: String,
+        observacao: String,
+        aoTerminar: () -> Unit = {}
+    ) {
         if (servico.isBlank() || data.isBlank() || hora.isBlank()) {
             erroAgendamento = "Preencha serviço, data e hora"
-            return false
+            return
         }
         val valor = preco.replace(",", ".").toDoubleOrNull()
         if (valor == null) {
             erroAgendamento = "Preço inválido"
-            return false
+            return
         }
-        agendamentos[posicao] = agendamentos[posicao].copy(
+        val atualizado = item.copy(
             servico = servico,
             data = data,
             hora = hora,
@@ -270,7 +363,15 @@ class MeuViewModel : ViewModel() {
             observacao = observacao
         )
         erroAgendamento = ""
-        return true
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                agendamentoDao.atualizar(atualizado)
+                carregarAgendamentos()
+                withContext(Dispatchers.Main) { aoTerminar() }
+            } catch (e: Exception) {
+                Log.e("Erro ao atualizar", "Agendamento: ${e.message}")
+            }
+        }
     }
 
     fun limparErroAgendamento() {

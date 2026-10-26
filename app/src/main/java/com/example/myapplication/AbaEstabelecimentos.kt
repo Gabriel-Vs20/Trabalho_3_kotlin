@@ -32,6 +32,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,6 +53,11 @@ fun AbaEstabelecimentos(navController: NavHostController, viewModel: MeuViewMode
     var nota by remember { mutableStateOf("") }
     var endereco by remember { mutableStateOf("") }
     var formularioAberto by remember { mutableStateOf(false) }
+
+    // busca os estabelecimentos (e os agendamentos, para a contagem de cada card) no banco
+    LaunchedEffect(Unit) {
+        viewModel.carregarTudo()
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -75,6 +81,14 @@ fun AbaEstabelecimentos(navController: NavHostController, viewModel: MeuViewMode
                             fontSize = 12.sp,
                             color = Color(0xFF6B7A74)
                         )
+                    }
+                    Button(
+                        onClick = { formularioAberto = !formularioAberto },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF009739)),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text(if (formularioAberto) "  Fechar" else "  Novo", fontWeight = FontWeight.Bold)
                     }
                 }
             }

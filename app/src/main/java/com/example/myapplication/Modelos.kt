@@ -1,15 +1,22 @@
 package com.example.myapplication
 
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "estabelecimentos")
 data class Estabelecimento(
-    val id: Int,
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
     val nome: String,
     val categoria: String,
     val nota: String,
     val endereco: String
 )
 
+@Entity(tableName = "agendamentos")
 data class Agendamento(
-    val id: Int,
+    @PrimaryKey(autoGenerate = true)
+    val id: Int = 0,
     val idEstabelecimento: Int,
     val servico: String,
     val data: String,
