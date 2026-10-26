@@ -171,33 +171,31 @@ class MeuViewModel(application: Application) : AndroidViewModel(application) {
     // ---------- Banco de dados (Room) ----------
 
     suspend fun carregarEstabelecimentos() {
-        val lista = withContext(Dispatchers.IO) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                estabelecimentoDao.buscarTodos()
+                val lista = estabelecimentoDao.buscarTodos()
+                withContext(Dispatchers.Main) {
+                    estabelecimentos.clear()
+                    estabelecimentos.addAll(lista)
+                }
             } catch (e: Exception) {
                 Log.e("Erro ao buscar", "Estabelecimentos: ${e.message}")
-                emptyList()
             }
-        }
-        withContext(Dispatchers.Main) {
-            estabelecimentos.clear()
-            estabelecimentos.addAll(lista)
-        }
+        }.join()
     }
 
     suspend fun carregarAgendamentos() {
-        val lista = withContext(Dispatchers.IO) {
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                agendamentoDao.buscarTodos()
+                val lista = agendamentoDao.buscarTodos()
+                withContext(Dispatchers.Main) {
+                    agendamentos.clear()
+                    agendamentos.addAll(lista)
+                }
             } catch (e: Exception) {
                 Log.e("Erro ao buscar", "Agendamentos: ${e.message}")
-                emptyList()
             }
-        }
-        withContext(Dispatchers.Main) {
-            agendamentos.clear()
-            agendamentos.addAll(lista)
-        }
+        }.join()
     }
 
     suspend fun carregarTudo() {
@@ -206,36 +204,39 @@ class MeuViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun buscarEstabelecimentoPorId(id: Int): Estabelecimento? {
-        return withContext(Dispatchers.IO) {
+        var item: Estabelecimento? = null
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                estabelecimentoDao.buscarPorId(id)
+                item = estabelecimentoDao.buscarPorId(id)
             } catch (e: Exception) {
                 Log.e("Erro ao buscar", "Estabelecimento $id: ${e.message}")
-                null
             }
-        }
+        }.join()
+        return item
     }
 
     suspend fun buscarAgendamentoPorId(id: Int): Agendamento? {
-        return withContext(Dispatchers.IO) {
+        var item: Agendamento? = null
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                agendamentoDao.buscarPorId(id)
+                item = agendamentoDao.buscarPorId(id)
             } catch (e: Exception) {
                 Log.e("Erro ao buscar", "Agendamento $id: ${e.message}")
-                null
             }
-        }
+        }.join()
+        return item
     }
 
     suspend fun buscarAgendamentosDoEstabelecimento(id: Int): List<Agendamento> {
-        return withContext(Dispatchers.IO) {
+        var lista: List<Agendamento> = emptyList()
+        CoroutineScope(Dispatchers.IO).launch {
             try {
-                agendamentoDao.buscarPorEstabelecimento(id)
+                lista = agendamentoDao.buscarPorEstabelecimento(id)
             } catch (e: Exception) {
                 Log.e("Erro ao buscar", "Agendamentos do estabelecimento $id: ${e.message}")
-                emptyList()
             }
-        }
+        }.join()
+        return lista
     }
 
     fun adicionarEstabelecimento(nome: String, categoria: String, nota: String, endereco: String): Boolean {
