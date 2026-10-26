@@ -31,7 +31,7 @@ Fora as 4 basicas colocamos buscarPorId nos dois DAOs, que é usado nas telas de
 
 No AgendamentoDAO tem tambem o buscarPorEstabelecimento pra mostrar os agendamentos e o total gasto no detalhe do estabelecimento, e o deletarPorEstabelecimento pra quando apagar um local apagar os agendamentos dele junto (no trabalho 2 ja fazia isso na lista).
 
-O atualizar é usado no salvar alterações do agendamento e no marcar como concluido.
+O atualizar é usado no salvar alterações do agendamento, no marcar como concluido e no editar estabelecimento (na tela de detalhe do local).
 
 ## O que deu problema
 

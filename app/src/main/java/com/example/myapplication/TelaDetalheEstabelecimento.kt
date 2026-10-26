@@ -10,9 +10,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -22,9 +24,13 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -39,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -50,10 +57,25 @@ fun TelaDetalheEstabelecimento(navController: NavHostController, viewModel: MeuV
     var local by remember { mutableStateOf<Estabelecimento?>(null) }
     var agendamentos by remember { mutableStateOf<List<Agendamento>>(emptyList()) }
     var carregando by remember { mutableStateOf(true) }
+    // muda de valor depois de salvar, para o LaunchedEffect buscar de novo no banco
+    var recarregar by remember { mutableStateOf(0) }
+
+    var nome by remember { mutableStateOf("") }
+    var categoria by remember { mutableStateOf("") }
+    var nota by remember { mutableStateOf("") }
+    var endereco by remember { mutableStateOf("") }
+    var salvo by remember { mutableStateOf(false) }
 
     // busca o estabelecimento e os agendamentos dele direto do banco, a partir do id da rota
-    LaunchedEffect(id) {
-        local = viewModel.buscarEstabelecimentoPorId(id)
+    LaunchedEffect(id, recarregar) {
+        val doBanco = viewModel.buscarEstabelecimentoPorId(id)
+        if (doBanco != null && carregando) {
+            nome = doBanco.nome
+            categoria = doBanco.categoria
+            nota = doBanco.nota
+            endereco = doBanco.endereco
+        }
+        local = doBanco
         agendamentos = viewModel.buscarAgendamentosDoEstabelecimento(id)
         carregando = false
     }
@@ -160,6 +182,105 @@ fun TelaDetalheEstabelecimento(navController: NavHostController, viewModel: MeuV
                 )
                 Spacer(modifier = Modifier.padding(4.dp))
                 Text(local.endereco, fontSize = 13.sp, color = Color(0xFF1F2937))
+            }
+
+            Spacer(modifier = Modifier.padding(8.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFFE2E8F0), RoundedCornerShape(12.dp))
+                    .padding(16.dp)
+            ) {
+
+                TituloSecao("Editar estabelecimento")
+                Spacer(modifier = Modifier.padding(5.dp))
+
+                OutlinedTextField(
+                    value = nome,
+                    onValueChange = { nome = it; salvo = false },
+                    label = { Text("Nome") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF009739),
+                        focusedLabelColor = Color(0xFF009739),
+                        cursorColor = Color(0xFF009739)
+                    )
+                )
+                Spacer(modifier = Modifier.padding(4.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = categoria,
+                        onValueChange = { categoria = it; salvo = false },
+                        label = { Text("Categoria") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF009739),
+                            focusedLabelColor = Color(0xFF009739),
+                            cursorColor = Color(0xFF009739)
+                        )
+                    )
+                    OutlinedTextField(
+                        value = nota,
+                        onValueChange = { nota = it; salvo = false },
+                        label = { Text("Nota") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF009739),
+                            focusedLabelColor = Color(0xFF009739),
+                            cursorColor = Color(0xFF009739)
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.padding(4.dp))
+
+                OutlinedTextField(
+                    value = endereco,
+                    onValueChange = { endereco = it; salvo = false },
+                    label = { Text("Endereço") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF009739),
+                        focusedLabelColor = Color(0xFF009739),
+                        cursorColor = Color(0xFF009739)
+                    )
+                )
+
+                if (viewModel.erroEstabelecimento.isNotBlank()) {
+                    Spacer(modifier = Modifier.padding(4.dp))
+                    CaixaErro(viewModel.erroEstabelecimento)
+                }
+
+                if (salvo) {
+                    Spacer(modifier = Modifier.padding(4.dp))
+                    CaixaSucesso("Estabelecimento atualizado")
+                }
+
+                Spacer(modifier = Modifier.padding(6.dp))
+
+                Button(
+                    onClick = {
+                        viewModel.atualizarEstabelecimento(local, nome, categoria, nota, endereco) {
+                            salvo = true
+                            recarregar++
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF009739)),
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    shape = RoundedCornerShape(10.dp)
+                ) { Text("Salvar alterações", fontWeight = FontWeight.ExtraBold) }
+
             }
 
             Spacer(modifier = Modifier.padding(8.dp))

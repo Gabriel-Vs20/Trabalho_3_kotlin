@@ -274,6 +274,36 @@ class MeuViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun atualizarEstabelecimento(
+        item: Estabelecimento,
+        nome: String,
+        categoria: String,
+        nota: String,
+        endereco: String,
+        aoTerminar: () -> Unit = {}
+    ) {
+        if (nome.isBlank() || categoria.isBlank()) {
+            erroEstabelecimento = "Informe pelo menos nome e categoria"
+            return
+        }
+        val atualizado = item.copy(
+            nome = nome,
+            categoria = categoria,
+            nota = if (nota.isBlank()) "0.0" else nota,
+            endereco = if (endereco.isBlank()) "Endereço não informado" else endereco
+        )
+        erroEstabelecimento = ""
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                estabelecimentoDao.atualizar(atualizado)
+                carregarEstabelecimentos()
+                withContext(Dispatchers.Main) { aoTerminar() }
+            } catch (e: Exception) {
+                Log.e("Erro ao atualizar", "Estabelecimento: ${e.message}")
+            }
+        }
+    }
+
     fun buscarEstabelecimento(id: Int): Estabelecimento? {
         return estabelecimentos.find { it.id == id }
     }
